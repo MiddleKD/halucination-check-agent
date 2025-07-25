@@ -11,6 +11,7 @@ get_source_agent = Agent(
     deps_type=StateDependencies,
     output_type=GetSourceAgentOutputType,
     tools=[tavily_search_tool(os.getenv("TAVILY_API_KEY"))],
+    instrument=True,
 )
 
 

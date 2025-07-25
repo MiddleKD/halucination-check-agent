@@ -16,4 +16,5 @@ reason_summary_agent = Agent(
         "**Your reason summary must be a clean, fluent summary within 300 characters.**"
         "RESPONSE IN KOREAN"
     ),
+    instrument=True,
 )

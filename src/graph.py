@@ -4,6 +4,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from trace import init_langfuse
+
+langfuse_cli, observe = init_langfuse()
+
 from typing import Literal
 
 from pydantic_ai import Agent
@@ -15,6 +19,7 @@ from agent.context_consistency_agent import context_consistency_agent
 from agent.get_source_agent import get_source_agent
 from agent.reason_summary_agent import reason_summary_agent
 from dto import GraphOutput, GraphState, StateDependencies
+from util import get_uuid
 
 from dataclasses import dataclass
 
@@ -179,6 +184,7 @@ class MergeResult(BaseNode[GraphState, None, GraphOutput]):
 
 def convert_graph_as_agent():
 
+    @observe()
     async def run_graph(user_prompt: list[ModelMessage], _) -> GraphOutput:
         
         user_input = user_prompt[-1].parts[0].content
@@ -207,16 +213,24 @@ def convert_graph_as_agent():
 
         result = await main_graph.run(GetSrcRoute(), state=state)
 
-        return ModelResponse(parts=[
-            TextPart(
-                content=json.dumps({
-                    "score": result.output.score,
-                    "ref_url": result.output.ref_url,
-                    "reason": result.output.reason,
-                },
-                ensure_ascii=False)
-            )
-        ])
+        result_content = json.dumps({
+            "score": result.output.score,
+            "ref_url": result.output.ref_url,
+            "reason": result.output.reason,
+        }, ensure_ascii=False)
+
+        langfuse_cli.update_current_trace(
+            name="Hallucination Check Agent",
+            input=user_input,
+            output=result_content,
+            user_id="middlek",
+            session_id=get_uuid(),
+            tags=["agent", "hallucination_check"],
+            metadata={"email": "middlek@gmail.com"},
+            version="1.0.0"
+        )
+
+        return ModelResponse(parts=[TextPart(content=result_content)])
 
     agent = Agent(
         FunctionModel(run_graph, model_name="function_graph_wrapper"),
@@ -225,13 +239,14 @@ def convert_graph_as_agent():
 
     return agent
 
-async def debug():
+@observe()
+async def debug(user_input: str, user_history: list[ModelMessage]):
     state = GraphState(
         stance_type="both",
         fall_back_mode=True,
         return_reason=True,
-        user_input="onnx가 생산성 측면에서 더 효율적입니다.",
-        user_history=[ModelResponse(parts=[TextPart(content="tensorrt와 onnx 중 뭐가 더 효율적일까?")])],
+        user_input=user_input,
+        user_history=user_history,
     )
 
     main_graph = Graph(
@@ -253,6 +268,26 @@ async def debug():
         async for node in run:
             print("Node:", node)
     print("Final output:", run.result.output)
+
+    result_content = json.dumps({
+        "score": run.result.output.score,
+        "ref_url": run.result.output.ref_url,
+        "reason": run.result.output.reason,
+    }, ensure_ascii=False)
+
+    langfuse_cli.update_current_trace(
+        name="Debug Hallucination Check Agent",
+        input=user_input,
+        output=result_content,
+        user_id="middlek",
+        session_id=get_uuid(),
+        tags=["agent", "debug", "hallucination_check"],
+        metadata={"email": "middlek@gmail.com"},
+        version="1.0.0"
+    )
     
 if __name__ == "__main__":
-    asyncio.run(debug())
+    asyncio.run(debug(
+        user_input="onnx가 생산성 측면에서 더 효율적입니다.",
+        user_history=[ModelResponse(parts=[TextPart(content="tensorrt와 onnx 중 뭐가 더 효율적일까?")])],
+    ))

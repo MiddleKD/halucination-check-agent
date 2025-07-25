@@ -8,6 +8,7 @@ context_consistency_agent = Agent(
     CONTEXT_CONSISTENCY_AGENT_MODEL,
     deps_type=StateDependencies,
     output_type=CtxConsistentAgentOutputType,
+    instrument=True,
 )
 
 

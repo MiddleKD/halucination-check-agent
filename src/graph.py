@@ -6,15 +6,20 @@ load_dotenv()
 
 from typing import Literal
 
-from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart
+from pydantic_ai import Agent
+from pydantic_ai.models.function import FunctionModel
+from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart
 from pydantic_graph import BaseNode, End, Graph, GraphRunContext
 
 from agent.context_consistency_agent import context_consistency_agent
 from agent.get_source_agent import get_source_agent
 from agent.reason_summary_agent import reason_summary_agent
 from dto import GraphOutput, GraphState, StateDependencies
+
 from dataclasses import dataclass
+
 import asyncio
+import json
 
 
 async def get_src_and_check(
@@ -172,8 +177,55 @@ class MergeResult(BaseNode[GraphState, None, GraphOutput]):
     async def run(self, ctx: GraphRunContext[GraphState]) -> End[GraphOutput]:
         return End(self.output)
 
+def convert_graph_as_agent():
 
-async def main():
+    async def run_graph(user_prompt: list[ModelMessage], _) -> GraphOutput:
+        
+        user_input = user_prompt[-1].parts[0].content
+        user_history = user_prompt[:-1]
+
+        state = GraphState(
+            stance_type="cons",
+            fall_back_mode=False,
+            return_reason=True,
+            user_input=user_input,
+            user_history=user_history,
+        )
+
+        main_graph = Graph(
+            nodes=(
+                GetSrcRoute,
+                ProsGetSrc,
+                ConsGetSrc,
+                BothGetSrc,
+                CheckScore,
+                SummaryReason,
+                MergeResult,
+            ),
+            name="hallucination_check_graph",
+        )
+
+        result = await main_graph.run(GetSrcRoute(), state=state)
+
+        return ModelResponse(parts=[
+            TextPart(
+                content=json.dumps({
+                    "score": result.output.score,
+                    "ref_url": result.output.ref_url,
+                    "reason": result.output.reason,
+                },
+                ensure_ascii=False)
+            )
+        ])
+
+    agent = Agent(
+        FunctionModel(run_graph, model_name="function_graph_wrapper"),
+        tools=[run_graph]
+    )
+
+    return agent
+
+async def debug():
     state = GraphState(
         stance_type="both",
         fall_back_mode=True,
@@ -201,7 +253,6 @@ async def main():
         async for node in run:
             print("Node:", node)
     print("Final output:", run.result.output)
-
-
+    
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(debug())

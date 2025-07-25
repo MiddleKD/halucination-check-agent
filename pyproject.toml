@@ -7,6 +7,6 @@ requires-python = ">=3.13"
 dependencies = [
     "langfuse>=3.2.1",
     "pydantic-ai>=0.4.7",
-    "pydantic-ai-slim[tavily]>=0.4.7",
+    "pydantic-ai-slim[a2a,tavily]>=0.4.7",
     "python-dotenv>=1.1.1",
 ]

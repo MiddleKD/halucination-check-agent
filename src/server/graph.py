@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from trace import init_langfuse
+from langfuse_trace import init_langfuse
 
 langfuse_cli, observe = init_langfuse()
 

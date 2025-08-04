@@ -224,10 +224,32 @@ async def run_graph(query: str | list[str], context_id: str) -> GraphOutput:
                     "reason": node.data.reason,
                 }
 
-                yield result_dict
+                yield {
+                    "input_required": False,
+                    "info": "Completed",
+                    "content": result_dict,
+                }
                 break
+            elif isinstance(node, (ProsGetSrc, ConsGetSrc, BothGetSrc)):
+                yield {
+                    "input_required": False,
+                    "info": "Searching source...",
+                    "content": None,
+                }
+            elif isinstance(node, CheckScore):
+                yield {
+                    "input_required": False,
+                    "info": "Checking score...",
+                    "content": None,
+                }
+            elif isinstance(node, SummaryReason):
+                yield {
+                    "input_required": False,
+                    "info": "Summarizing reason...",
+                    "content": None,
+                }
             else:
-                yield {"node": node.__class__.__name__, "info": str(node)}
+                pass
 
     langfuse_cli.update_current_trace(
         name="Debug Hallucination Check Agent",

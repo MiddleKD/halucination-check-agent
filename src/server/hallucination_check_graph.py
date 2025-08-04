@@ -11,8 +11,7 @@ langfuse_cli = init_langfuse()
 import asyncio
 import json
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Literal
+from typing import Literal, AsyncGenerator, Any
 
 from agent.context_consistency_agent import context_consistency_agent
 from agent.get_source_agent import get_source_agent
@@ -184,7 +183,7 @@ class MergeResult(BaseNode[GraphState, None, GraphOutput]):
         return End(self.output)
 
 
-async def run_graph(query: str | list[str], context_id: str) -> GraphOutput:
+async def run_graph(query: str | list[str], context_id: str) -> AsyncGenerator[dict[str, Any]]:
     if isinstance(query, str):
         query = [query]
 

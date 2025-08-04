@@ -2,10 +2,7 @@ from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import AgentCapabilities, AgentCard, AgentProvider, AgentSkill
-from graph import convert_graph_as_agent
-
-agent_executor = convert_graph_as_agent()
-
+from executor import HallucinationCheckExecutor, NonsenseCheckExecutor
 
 def main(host, port):
     capabilities = AgentCapabilities(streaming=False, push_notifications=False)
@@ -34,7 +31,7 @@ def main(host, port):
     )
 
     request_handler = DefaultRequestHandler(
-        agent_executor=agent_executor,
+        agent_executor=HallucinationCheckExecutor(),
         task_store=InMemoryTaskStore(),
     )
     server = A2AStarletteApplication(

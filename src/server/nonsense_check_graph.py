@@ -26,6 +26,7 @@ from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_graph import BaseNode, End, Graph, GraphRunContext
 from pydantic_graph.persistence.file import FileStatePersistence
+from typing import AsyncGenerator, Any
 
 
 async def check_with_input_src(
@@ -139,7 +140,7 @@ class MergeResult(BaseNode[GraphState, None, GraphOutput]):
         return End(self.output)
 
 
-async def run_graph(query: str | list[str], input_context: str, context_id: str) -> GraphOutput:
+async def run_graph(query: str | list[str], input_context: str, context_id: str) -> AsyncGenerator[dict[str, Any]]:
     if isinstance(query, str):
         query = [query]
 

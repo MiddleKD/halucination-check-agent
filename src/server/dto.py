@@ -1,10 +1,9 @@
 from dataclasses import dataclass, field
 from typing import List, Literal
 
+from constant import DEFAULT_FALLBACK_LIMIT, SCORE_DIFF_THRESHOLD
 from pydantic import BaseModel, Field
 from pydantic_ai.messages import ModelMessage
-
-from constant import DEFAULT_FALLBACK_LIMIT, SCORE_DIFF_THRESHOLD
 
 
 @dataclass

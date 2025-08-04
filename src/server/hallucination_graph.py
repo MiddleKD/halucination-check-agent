@@ -8,23 +8,20 @@ from langfuse_trace import init_langfuse
 
 langfuse_cli, observe = init_langfuse()
 
+import asyncio
+import json
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
-
-from pydantic_ai import Agent
-from pydantic_ai.models.function import FunctionModel
-from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart
-from pydantic_graph import BaseNode, End, Graph, GraphRunContext
 
 from agent.context_consistency_agent import context_consistency_agent
 from agent.get_source_agent import get_source_agent
 from agent.reason_summary_agent import reason_summary_agent
 from dto import GraphOutput, GraphState, StateDependencies
-from util import get_uuid
-
-from dataclasses import dataclass
-
-import asyncio
-import json
+from pydantic_ai import Agent
+from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart
+from pydantic_ai.models.function import FunctionModel
+from pydantic_graph import BaseNode, End, Graph, GraphRunContext
 
 
 async def get_src_and_check(
@@ -182,72 +179,14 @@ class MergeResult(BaseNode[GraphState, None, GraphOutput]):
     async def run(self, ctx: GraphRunContext[GraphState]) -> End[GraphOutput]:
         return End(self.output)
 
-def convert_graph_as_agent():
 
-    @observe()
-    async def run_graph(user_prompt: list[ModelMessage], _) -> GraphOutput:
-        
-        user_input = user_prompt[-1].parts[0].content
-        user_history = user_prompt[:-1]
+@observe
+async def run_graph(query: str | list[str], context_id: str) -> GraphOutput:
+    if isinstance(query, str):
+        query = [query]
 
-        state = GraphState(
-            stance_type="cons",
-            fall_back_mode=False,
-            return_reason=True,
-            user_input=user_input,
-            user_history=user_history,
-        )
-
-        main_graph = Graph(
-            nodes=(
-                GetSrcRoute,
-                ProsGetSrc,
-                ConsGetSrc,
-                BothGetSrc,
-                CheckScore,
-                SummaryReason,
-                MergeResult,
-            ),
-            name="hallucination_check_graph",
-        )
-
-        result = await main_graph.run(GetSrcRoute(), state=state)
-
-        result_content = json.dumps({
-            "score": result.output.score,
-            "ref_url": result.output.ref_url,
-            "reason": result.output.reason,
-        }, ensure_ascii=False)
-
-        langfuse_cli.update_current_trace(
-            name="Hallucination Check Agent",
-            input=user_input,
-            output=result_content,
-            user_id="middlek",
-            session_id=get_uuid(),
-            tags=["agent", "hallucination_check"],
-            metadata={"email": "middlek@gmail.com"},
-            version="1.0.0"
-        )
-
-        return ModelResponse(parts=[TextPart(content=result_content)])
-
-    agent = Agent(
-        FunctionModel(run_graph, model_name="function_graph_wrapper"),
-        tools=[run_graph]
-    )
-
-    return agent
-
-@observe()
-async def debug(user_input: str, user_history: list[ModelMessage]):
-    state = GraphState(
-        stance_type="both",
-        fall_back_mode=True,
-        return_reason=True,
-        user_input=user_input,
-        user_history=user_history,
-    )
+    user_input = query[-1]
+    user_history = query[:-1]
 
     main_graph = Graph(
         nodes=(
@@ -262,32 +201,61 @@ async def debug(user_input: str, user_history: list[ModelMessage]):
         name="hallucination_check_graph",
     )
 
-    async with main_graph.iter(
-        GetSrcRoute(), state=state
-    ) as run:
-        async for node in run:
-            print("Node:", node)
-    print("Final output:", run.result.output)
+    state = GraphState(
+        stance_type="cons",
+        fall_back_mode=False,
+        return_reason=True,
+        user_input=user_input,
+        user_history=user_history,
+    )
+    start_node = GetSrcRoute()
 
-    result_content = json.dumps({
-        "score": run.result.output.score,
-        "ref_url": run.result.output.ref_url,
-        "reason": run.result.output.reason,
-    }, ensure_ascii=False)
+    async with main_graph.iter(start_node, state=state) as run:
+        while True:
+            node = await run.next()
+            if isinstance(node, End):
+                result_dict = {
+                    "score": node.data.score,
+                    "ref_url": node.data.ref_url,
+                    "reason": node.data.reason,
+                }
+
+                yield result_dict
+                break
+            else:
+                yield {"node": node.__class__.__name__, "info": str(node)}
 
     langfuse_cli.update_current_trace(
         name="Debug Hallucination Check Agent",
         input=user_input,
-        output=result_content,
+        output=result_dict,
         user_id="middlek",
-        session_id=get_uuid(),
+        session_id=context_id,
         tags=["agent", "debug", "hallucination_check"],
         metadata={"email": "middlek@gmail.com"},
-        version="1.0.0"
+        version="1.0.0",
     )
-    
+
+
+async def main(query: str | list[str], context_id: str) -> str:
+    async for response in run_graph(
+        query=query,
+        context_id=context_id,
+    ):
+        print(response)
+    return response
+
+
+def convert_graph_as_agent():
+    async def run_graph(user_prompt: list[ModelMessage], _) -> ModelResponse:
+        result = await main(user_prompt, "test_id")
+        return ModelResponse(parts=[TextPart(content=json.dumps(result))])
+
+    agent = Agent(
+        FunctionModel(run_graph, model_name="function_graph_wrapper"), tools=[run_graph]
+    )
+    return agent
+
+
 if __name__ == "__main__":
-    asyncio.run(debug(
-        user_input="onnx가 생산성 측면에서 더 효율적입니다.",
-        user_history=[ModelResponse(parts=[TextPart(content="tensorrt와 onnx 중 뭐가 더 효율적일까?")])],
-    ))
+    asyncio.run(main("onnx가 tensorrt 보다 생산성 측면에서 더 효율적입니다.", "test_id"))

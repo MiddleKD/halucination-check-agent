@@ -1,11 +1,10 @@
-from graph import convert_graph_as_agent
 from fasta2a.schema import AgentProvider, Skill
+from graph import convert_graph_as_agent
 
 agent = convert_graph_as_agent()
 
 provider = AgentProvider(
-    organization="seocho-data-study",
-    url="https://github.com/cdkkim/data-study"
+    organization="seocho-data-study", url="https://github.com/cdkkim/data-study"
 )
 agent_skill = Skill(
     id="hallucination_check_agent",
@@ -25,3 +24,8 @@ app = agent.to_a2a(
     provider=provider,
     skills=[agent_skill],
 )
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8008)

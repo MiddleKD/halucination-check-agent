@@ -1,10 +1,9 @@
 import os
 
-from pydantic_ai import Agent, RunContext
-from pydantic_ai.common_tools.tavily import tavily_search_tool
-
 from constant import GET_SOURCE_AGENT_MODEL
 from dto import GetSourceAgentOutputType, StateDependencies
+from pydantic_ai import Agent, RunContext
+from pydantic_ai.common_tools.tavily import tavily_search_tool
 
 get_source_agent = Agent(
     GET_SOURCE_AGENT_MODEL,

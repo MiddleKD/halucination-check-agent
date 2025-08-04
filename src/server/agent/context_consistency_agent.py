@@ -1,8 +1,6 @@
-from pydantic_ai import Agent, RunContext
-
 from constant import CONTEXT_CONSISTENCY_AGENT_MODEL
-from dto import CtxConsistentAgentOutputType
-from dto import StateDependencies
+from dto import CtxConsistentAgentOutputType, StateDependencies
+from pydantic_ai import Agent, RunContext
 
 context_consistency_agent = Agent(
     CONTEXT_CONSISTENCY_AGENT_MODEL,

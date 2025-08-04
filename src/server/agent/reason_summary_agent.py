@@ -1,7 +1,6 @@
-from pydantic_ai import Agent
-
 from constant import REASON_SUMMARY_AGENT_MODEL
 from dto import ReasonSummaryAgentOutputType, StateDependencies
+from pydantic_ai import Agent
 
 reason_summary_agent = Agent(
     REASON_SUMMARY_AGENT_MODEL,

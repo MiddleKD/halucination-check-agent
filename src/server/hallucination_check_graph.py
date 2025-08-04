@@ -6,7 +6,7 @@ load_dotenv()
 
 from langfuse_trace import init_langfuse
 
-langfuse_cli, observe = init_langfuse()
+langfuse_cli = init_langfuse()
 
 import asyncio
 import json
@@ -184,7 +184,6 @@ class MergeResult(BaseNode[GraphState, None, GraphOutput]):
         return End(self.output)
 
 
-@observe
 async def run_graph(query: str | list[str], context_id: str) -> GraphOutput:
     if isinstance(query, str):
         query = [query]
@@ -214,53 +213,59 @@ async def run_graph(query: str | list[str], context_id: str) -> GraphOutput:
     )
     start_node = GetSrcRoute()
 
-    async with main_graph.iter(start_node, state=state) as run:
-        while True:
-            node = await run.next()
-            if isinstance(node, End):
-                result_dict = {
-                    "score": node.data.score,
-                    "ref_url": node.data.ref_url,
-                    "reason": node.data.reason,
-                }
-
-                yield {
-                    "input_required": False,
-                    "info": "Completed",
-                    "content": result_dict,
-                }
-                break
-            elif isinstance(node, (ProsGetSrc, ConsGetSrc, BothGetSrc)):
-                yield {
-                    "input_required": False,
-                    "info": "Searching source...",
-                    "content": None,
-                }
-            elif isinstance(node, CheckScore):
-                yield {
-                    "input_required": False,
-                    "info": "Checking score...",
-                    "content": None,
-                }
-            elif isinstance(node, SummaryReason):
-                yield {
-                    "input_required": False,
-                    "info": "Summarizing reason...",
-                    "content": None,
-                }
-            else:
-                pass
-
-    langfuse_cli.update_current_trace(
-        name="Debug Hallucination Check Agent",
+    with langfuse_cli.start_as_current_span(
+        name="hallucination_check_graph",
         input=user_input,
-        output=result_dict,
-        user_id="middlek",
-        session_id=context_id,
-        tags=["agent", "debug", "hallucination_check"],
-        metadata={"email": "middlek@gmail.com"},
-        version="1.0.0",
-    )
+    ) as langfuse_span:
+        langfuse_span.update_trace(
+            name="Debug Hallucination Check Agent",
+            user_id="middlek",
+            session_id=context_id,
+            tags=["agent", "debug", "hallucination_check"],
+            metadata={"email": "middlek@gmail.com"},
+            version="1.0.0",
+        )
+
+        result_dict = None
+        async with main_graph.iter(start_node, state=state) as run:
+            while True:
+                node = await run.next()
+                if isinstance(node, End):
+                    result_dict = {
+                        "score": node.data.score,
+                        "ref_url": node.data.ref_url,
+                        "reason": node.data.reason,
+                    }
+
+                    yield {
+                        "input_required": False,
+                        "info": "Completed",
+                        "content": result_dict,
+                    }
+                    break
+                elif isinstance(node, (ProsGetSrc, ConsGetSrc, BothGetSrc)):
+                    yield {
+                        "input_required": False,
+                        "info": "Searching source...",
+                        "content": None,
+                    }
+                elif isinstance(node, CheckScore):
+                    yield {
+                        "input_required": False,
+                        "info": "Checking score...",
+                        "content": None,
+                    }
+                elif isinstance(node, SummaryReason):
+                    yield {
+                        "input_required": False,
+                        "info": "Summarizing reason...",
+                        "content": None,
+                    }
+                else:
+                    pass
+        
+        if result_dict:
+            langfuse_span.update_trace(output=result_dict)
 
 
 async def main(query: str | list[str], context_id: str) -> str:

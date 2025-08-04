@@ -2,7 +2,7 @@ import os
 
 import logfire
 
-from langfuse import get_client, observe
+from langfuse import get_client
 
 
 def init_langfuse():
@@ -19,4 +19,4 @@ def init_langfuse():
     logfire.instrument_httpx(capture_all=True)
     # logfire.instrument_asyncpg()
 
-    return langfuse_cli, observe
+    return langfuse_cli

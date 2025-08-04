@@ -6,7 +6,7 @@ load_dotenv()
 
 from langfuse_trace import init_langfuse
 
-langfuse_cli, observe = init_langfuse()
+langfuse_cli = init_langfuse()
 
 import asyncio
 import json
@@ -139,7 +139,6 @@ class MergeResult(BaseNode[GraphState, None, GraphOutput]):
         return End(self.output)
 
 
-@observe
 async def run_graph(query: str | list[str], input_context: str, context_id: str) -> GraphOutput:
     if isinstance(query, str):
         query = [query]
@@ -177,33 +176,74 @@ async def run_graph(query: str | list[str], input_context: str, context_id: str)
         )
         start_node = EnoughContext()
 
-    async with main_graph.iter(start_node, state=state, persistence=persistence) as run:
-        while True:
-            node = await run.next()
-            if isinstance(node, End):
-                result_dict = {
-                    "score": node.data.score,
-                    "reason": node.data.reason,
-                }
-
-                yield result_dict
-                break
-            elif isinstance(node, RequestMoreContext):
-                yield {"input_required": True, "node": node.__class__.__name__, "info": str(node)}
-                break
-            else:
-                yield {"node": node.__class__.__name__, "info": str(node)}
-
-    langfuse_cli.update_current_trace(
-        name="Debug Nonsense Check Agent",
+    with langfuse_cli.start_as_current_span(
+        name="nonsense_check_graph",
         input=user_input,
-        output=result_dict,
-        user_id="middlek",
-        session_id=context_id,
-        tags=["agent", "debug", "nonsense_check"],
-        metadata={"email": "middlek@gmail.com"},
-        version="1.0.0",
-    )
+    ) as langfuse_span:
+        langfuse_span.update_trace(
+            name="Debug Nonsense Check Agent",
+            user_id="middlek",
+            session_id=context_id,
+            tags=["agent", "debug", "nonsense_check"],
+            metadata={"email": "middlek@gmail.com"},
+            version="1.0.0",
+        )
+
+        result_dict = None
+        async with main_graph.iter(start_node, state=state, persistence=persistence) as run:
+            while True:
+                node = await run.next()
+                if isinstance(node, End):
+                    result_dict = {
+                        "score": node.data.score,
+                        "reason": node.data.reason,
+                    }
+
+                    yield {
+                        "input_required": False,
+                        "info": "Completed",
+                        "content": result_dict,
+                    }
+                    break
+                elif isinstance(node, RequestMoreContext):
+                    result_dict = {
+                        "info": "Need more information",
+                        "content": "판단하기 위한 정보가 부족합니다. 추가 정보를 제공해 주세요."
+                    }
+                    yield {
+                        "input_required": True, 
+                        **result_dict,
+                    }
+                    break
+                elif isinstance(node, EnoughContext):
+                    yield {
+                        "input_required": False,
+                        "info": "Checking given information is enough...",
+                        "content": None,
+                    }
+                elif isinstance(node, CheckContext):
+                    yield {
+                        "input_required": False,
+                        "info": "Checking consistency context and query...",
+                        "content": None,
+                    }
+                elif isinstance(node, CheckScore):
+                    yield {
+                        "input_required": False,
+                        "info": "Checking score...",
+                        "content": None,
+                    }
+                elif isinstance(node, SummaryReason):
+                    yield {
+                        "input_required": False,
+                        "info": "Summarizing reason...",
+                        "content": None,
+                    }
+                else:
+                    pass
+
+        if result_dict:
+            langfuse_span.update_trace(output=result_dict)
 
 async def main(query: str | list[str], input_context: str, context_id: str) -> str:
     async for response in run_graph(

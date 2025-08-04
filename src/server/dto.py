@@ -13,7 +13,7 @@ class StateDependencies:
 
 
 @dataclass
-class GraphState:
+class HallucinationGraphState:
     stance_type: Literal["pros", "cons", "both"] = "cons"
     fall_back_mode: bool = False
     return_reason: bool = False
@@ -30,7 +30,7 @@ class GraphState:
 
 
 @dataclass
-class GraphOutput:
+class HallucinationGraphOutput:
     score: float
     reason: str | None
     ref_url: List[str]

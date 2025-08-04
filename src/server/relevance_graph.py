@@ -18,7 +18,11 @@ from agent.context_consistency_agent import context_consistency_agent
 from agent.get_source_agent import get_source_agent
 from agent.reason_summary_agent import reason_summary_agent
 from constant import GRAPH_PERSISTENCE_STATE_PATH_DIR
-from dto import GraphOutput, GraphState, StateDependencies
+from dto import (
+    HallucinationGraphOutput as GraphOutput,
+    HallucinationGraphState as GraphState,
+    StateDependencies,
+)
 from pydantic_ai import Agent
 from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models.function import FunctionModel

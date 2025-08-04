@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Literal
 
 from agent.context_consistency_agent import context_consistency_agent
-from agent.get_source_agent import get_source_agent
 from agent.reason_summary_agent import reason_summary_agent
 from constant import GRAPH_PERSISTENCE_STATE_PATH_DIR
 from dto import (
@@ -30,21 +29,16 @@ from pydantic_graph import BaseNode, End, Graph, GraphRunContext
 from pydantic_graph.persistence.file import FileStatePersistence
 
 
-async def get_src_and_check(
-    ctx: GraphRunContext[GraphState], stance_type: Literal["pros", "cons"]
+async def check_with_input_src(
+    ctx: GraphRunContext[GraphState], input_src: str
 ):
     deps = StateDependencies(
-        stance_type=stance_type,
+        stance_type="pros", # not used
         return_reason=ctx.state.return_reason,
-    )
-    src_result = await get_source_agent.run(
-        user_prompt=ctx.state.user_input,
-        deps=deps,
-        message_history=ctx.state.user_history,
     )
 
     ctx_result = await context_consistency_agent.run(
-        user_prompt=f"Context: {src_result.output.summary}\n\nSentence: {ctx.state.user_input}",
+        user_prompt=f"Context: {input_src}\n\nSentence: {ctx.state.user_input}",
         deps=deps,
         message_history=ctx.state.user_history,
     )

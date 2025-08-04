@@ -36,6 +36,28 @@ class HallucinationGraphOutput:
     ref_url: List[str]
 
 
+@dataclass
+class NonsenseCheckState:
+    return_reason: bool = False
+    fall_back_mode: bool = False
+    fall_back_limit: int = DEFAULT_FALLBACK_LIMIT
+    score_diff_threshold: float = SCORE_DIFF_THRESHOLD
+    current_fallback: int = 0
+
+    scores: List[float] = field(default_factory=list)
+    reasons: List[str] = field(default_factory=list)
+
+    user_input: str = ""
+    user_history: list[ModelMessage] = field(default_factory=list)
+    input_context: str = ""
+
+
+@dataclass
+class NonsenseCheckOutput:
+    score: float
+    reason: str | None
+
+
 class GetSourceAgentOutputType(BaseModel):
     summary: str = Field(description="Summary of the reference")
     ref_url: List[str] = Field(

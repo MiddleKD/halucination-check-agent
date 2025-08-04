@@ -12,14 +12,13 @@ import asyncio
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
 
 from agent.context_consistency_agent import context_consistency_agent
 from agent.reason_summary_agent import reason_summary_agent
-from constant import GRAPH_PERSISTENCE_STATE_PATH_DIR
+from constant import GRAPH_PERSISTENCE_STATE_PATH_DIR, DUMMY_CONTEXT
 from dto import (
-    HallucinationGraphOutput as GraphOutput,
-    HallucinationGraphState as GraphState,
+    NonsenseCheckOutput as GraphOutput,
+    NonsenseCheckState as GraphState,
     StateDependencies,
 )
 from pydantic_ai import Agent
@@ -43,104 +42,66 @@ async def check_with_input_src(
         message_history=ctx.state.user_history,
     )
 
-    hallucination_score = ctx_result.output.hallucination_score
-    ref_url = src_result.output.ref_url
+    nonsense_score = ctx_result.output.hallucination_score
 
     reason = None
     if ctx.state.return_reason:
         reason = ctx_result.output.reason
 
-    return hallucination_score, ref_url, reason
+    return nonsense_score, reason
 
 
 @dataclass
-class GetSrcRoute(BaseNode[GraphState]):
-    async def run(self, ctx: GraphRunContext[GraphState]) -> ProsGetSrc | ConsGetSrc:
-        if ctx.state.stance_type == "pros":
-            return ProsGetSrc()
-        elif ctx.state.stance_type == "cons":
-            return ConsGetSrc()
-        elif ctx.state.stance_type == "both":
-            return BothGetSrc()
+class EnoughContext(BaseNode[GraphState]):
+    async def run(self, ctx: GraphRunContext[GraphState]) -> CheckContext | RequestMoreContext:
+        if len(ctx.state.input_context) > 100:
+            return CheckContext()
+        else:
+            return RequestMoreContext()
 
 
 @dataclass
-class ProsGetSrc(BaseNode[GraphState]):
+class CheckContext(BaseNode[GraphState]):
     async def run(self, ctx: GraphRunContext[GraphState]) -> CheckScore:
-        hallucination_score, ref_url, reason = await get_src_and_check(ctx, "pros")
+        nonsense_score, reason = await check_with_input_src(
+            ctx,
+            ctx.state.input_context,
+        )
 
         return CheckScore(
-            hallucination_score=hallucination_score,
-            ref_url=ref_url,
+            nonsense_score=nonsense_score,
             reason=reason,
         )
 
 
 @dataclass
-class ConsGetSrc(BaseNode[GraphState]):
-    async def run(self, ctx: GraphRunContext[GraphState]) -> CheckScore:
-        hallucination_score, ref_url, reason = await get_src_and_check(ctx, "cons")
-
-        return CheckScore(
-            hallucination_score=hallucination_score,
-            ref_url=ref_url,
-            reason=reason,
-        )
-
-
-@dataclass
-class BothGetSrc(BaseNode[GraphState]):
-    async def run(self, ctx: GraphRunContext[GraphState]) -> CheckScore:
-        tasks = [
-            get_src_and_check(ctx, "pros"),
-            get_src_and_check(ctx, "cons"),
-        ]
-
-        pros_result, cons_result = await asyncio.gather(*tasks)
-
-        return CheckScore(
-            hallucination_score=[pros_result[0], cons_result[0]],
-            ref_url=[pros_result[1], cons_result[1]],
-            reason=[pros_result[2], cons_result[2]]
-            if ctx.state.return_reason
-            else None,
-        )
+class RequestMoreContext(BaseNode[GraphState]):
+    input_context: str = ""
+    async def run(self, ctx: GraphRunContext[GraphState]) -> EnoughContext:
+        ctx.state.input_context += self.input_context
+        return EnoughContext()
 
 
 @dataclass
 class CheckScore(BaseNode[GraphState]):
-    hallucination_score: float | list[float]
-    ref_url: list[str] | list[list[str]]
-    reason: str | list[str] | None
+    nonsense_score: float
+    reason: str | None
 
     async def run(
         self, ctx: GraphRunContext[GraphState]
-    ) -> MergeResult | SummaryReason | GetSrcRoute:
+    ) -> MergeResult | SummaryReason | CheckContext:
 
         do_fallback = False
-        if ctx.state.stance_type == "both":
-            abs_diff = abs(self.hallucination_score[0] - self.hallucination_score[1])
-            if abs_diff > ctx.state.score_diff_threshold:
-                do_fallback = True
-        else:
-            if abs(self.hallucination_score - 0.5) < ctx.state.score_diff_threshold:
-                do_fallback = True
+        if abs(self.nonsense_score - 0.5) < ctx.state.score_diff_threshold:
+            do_fallback = True
 
         if do_fallback and ctx.state.current_fallback < ctx.state.fall_back_limit:
             ctx.state.current_fallback += 1
-            return GetSrcRoute()
+            return CheckContext()
         else:
-            if ctx.state.stance_type == "both":
-                ctx.state.ref_url += self.ref_url[0]
-                ctx.state.ref_url += self.ref_url[1]
-                ctx.state.scores += self.hallucination_score
-                if ctx.state.return_reason:
-                    ctx.state.reasons += self.reason
-            else:
-                ctx.state.ref_url += self.ref_url
-                ctx.state.scores.append(self.hallucination_score)
-                if ctx.state.return_reason:
-                    ctx.state.reasons.append(self.reason)
+            ctx.state.scores.append(self.nonsense_score)
+            if ctx.state.return_reason:
+                ctx.state.reasons.append(self.reason)
 
             if ctx.state.return_reason:
                 return SummaryReason()
@@ -148,7 +109,6 @@ class CheckScore(BaseNode[GraphState]):
                 return MergeResult(
                     GraphOutput(
                         score=sum(ctx.state.scores) / len(ctx.state.scores),
-                        ref_url=ctx.state.ref_url,
                         reason=None,
                     )
                 )
@@ -166,7 +126,6 @@ class SummaryReason(BaseNode[GraphState]):
         return MergeResult(
             GraphOutput(
                 score=sum(ctx.state.scores) / len(ctx.state.scores),
-                ref_url=ctx.state.ref_url,
                 reason=reason_summary.output.summary,
             )
         )
@@ -180,7 +139,8 @@ class MergeResult(BaseNode[GraphState, None, GraphOutput]):
         return End(self.output)
 
 
-async def run_graph(query: str | list[str], context_id: str) -> GraphOutput:
+@observe
+async def run_graph(query: str | list[str], input_context: str, context_id: str) -> GraphOutput:
     if isinstance(query, str):
         query = [query]
 
@@ -189,15 +149,14 @@ async def run_graph(query: str | list[str], context_id: str) -> GraphOutput:
 
     main_graph = Graph(
         nodes=(
-            GetSrcRoute,
-            ProsGetSrc,
-            ConsGetSrc,
-            BothGetSrc,
+            EnoughContext,
+            CheckContext,
+            RequestMoreContext,
             CheckScore,
             SummaryReason,
             MergeResult,
         ),
-        name="hallucination_check_graph",
+        name="nonsense_check_graph",
     )
 
     persistence = FileStatePersistence(
@@ -207,48 +166,59 @@ async def run_graph(query: str | list[str], context_id: str) -> GraphOutput:
 
     if snapshot := await persistence.load_next():
         state = snapshot.state
-        start_node = None
+        start_node = RequestMoreContext(input_context=input_context)
     else:
         state = GraphState(
-            stance_type="cons",
             fall_back_mode=False,
             return_reason=True,
             user_input=user_input,
             user_history=user_history,
+            input_context=input_context,
         )
-        start_node = GetSrcRoute()
+        start_node = EnoughContext()
 
     async with main_graph.iter(start_node, state=state, persistence=persistence) as run:
         while True:
             node = await run.next()
             if isinstance(node, End):
-                result_content = json.dumps(
-                    {
-                        "score": node.data.score,
-                        "ref_url": node.data.ref_url,
-                        "reason": node.data.reason,
-                    },
-                    ensure_ascii=False,
-                )
-                yield ModelResponse(parts=[TextPart(content=result_content)])
+                result_dict = {
+                    "score": node.data.score,
+                    "reason": node.data.reason,
+                }
+
+                yield result_dict
+                break
+            elif isinstance(node, RequestMoreContext):
+                yield {"input_required": True, "node": node.__class__.__name__, "info": str(node)}
                 break
             else:
-                yield ModelResponse(parts=[TextPart(content="Node: " + str(node))])
+                yield {"node": node.__class__.__name__, "info": str(node)}
 
+    langfuse_cli.update_current_trace(
+        name="Debug Nonsense Check Agent",
+        input=user_input,
+        output=result_dict,
+        user_id="middlek",
+        session_id=context_id,
+        tags=["agent", "debug", "nonsense_check"],
+        metadata={"email": "middlek@gmail.com"},
+        version="1.0.0",
+    )
 
-async def main(query: str | list[str], context_id: str) -> str:
+async def main(query: str | list[str], input_context: str, context_id: str) -> str:
     async for response in run_graph(
         query=query,
+        input_context=input_context,
         context_id=context_id,
     ):
-        print(response.parts[0].content, flush=True)
-    return response.parts[0].content
+        print(response, flush=True)
+    return response
 
 
 def convert_graph_as_agent():
     async def run_graph(user_prompt: list[ModelMessage], _) -> ModelResponse:
         result = await main(user_prompt, "test_id")
-        return ModelResponse(parts=[TextPart(content=result)])
+        return ModelResponse(parts=[TextPart(content=json.dumps(result))])
 
     agent = Agent(
         FunctionModel(run_graph, model_name="function_graph_wrapper"), tools=[run_graph]
@@ -258,4 +228,11 @@ def convert_graph_as_agent():
 
 
 if __name__ == "__main__":
-    asyncio.run(main("onnx가 tensorrt 보다 생산성 측면에서 더 효율적입니다.", "test_id"))
+    asyncio.run(main(
+        "홍길동씨는 소프트웨어전공을 살린 직장을 다니고 있으며 현재 삼성헬스케어에 다니고 있습니다.",
+        "안녕하세요",
+        "test_id"))
+    asyncio.run(main(
+        "홍길동씨는 소프트웨어전공을 살린 직장을 다니고 있으며 현재 삼성헬스케어에 다니고 있습니다.",
+        DUMMY_CONTEXT,
+        "test_id"))

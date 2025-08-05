@@ -1,5 +1,5 @@
 import os
-
+import base64
 import logfire
 
 from langfuse import get_client
@@ -13,7 +13,11 @@ def init_langfuse():
     else:
         print("Authentication failed. Please check your credentials and host.")
 
-    os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://localhost:3000"
+    langfuse_auth = base64.b64encode(
+        f"{os.getenv("LANGFUSE_PUBLIC_KEY")}:{os.getenv("LANGFUSE_SECRET_KEY")}".encode()
+    ).decode()
+    os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"Authorization=Basic {langfuse_auth}"
+
     logfire.configure(send_to_logfire=False)
     logfire.instrument_pydantic_ai()
     logfire.instrument_httpx(capture_all=True)

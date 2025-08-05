@@ -4,12 +4,12 @@ from uuid import uuid4
 
 import httpx
 from a2a.client import A2ACardResolver, A2AClient
-from a2a.types import (GetTaskRequest, MessageSendParams, SendMessageRequest,
+from a2a.types import (GetTaskRequest, MessageSendParams, Message,
                        SendStreamingMessageRequest, TaskQueryParams)
 
 
 def print_welcome_message() -> None:
-    print("Welcome to the generic A2A client!")
+    print("Welcome to the Halucination Check Agent A2A client!")
     print("Please enter your query (type 'exit' to quit):")
 
 
@@ -18,7 +18,7 @@ def get_user_query() -> str:
 
 
 async def interact_with_server(client: A2AClient) -> None:
-    unique_id = uuid4().hex
+    # breakpoint()
     while True:
 
         user_input = get_user_query()
@@ -27,32 +27,24 @@ async def interact_with_server(client: A2AClient) -> None:
             break
 
         send_message_payload: dict[str, Any] = {
-            "message": {
-                "role": "user",
-                "parts": [{"type": "text", "text": user_input}],
-                "messageId": uuid4().hex,
-                "taskId": unique_id,  # do not work
-                "contextId": unique_id,
-            },
+            "message": Message(
+                message_id=uuid4().hex,
+                role="user",
+                parts=[{"type": "text", "text": user_input}],
+            ),
+            "metadata": {
+                "enable_tavily_search_engine/v1": {"enable": True}
+            }
         }
 
         try:
-            message_request = SendMessageRequest(
-                id=unique_id, params=MessageSendParams(**send_message_payload)
+            message_request = SendStreamingMessageRequest(
+                id=uuid4().hex, params=MessageSendParams(**send_message_payload)
             )
-            response = await client.send_message(message_request)
-            print(response)
 
-            task_id = response.root.id
-            task = await client.get_task(
-                GetTaskRequest(
-                    id=unique_id,
-                    params=TaskQueryParams(
-                        id="24dba0ca-a12b-41ba-be2f-958212508663", history_length=10
-                    ),
-                )
-            )
-            print("Task: ", task)
+            async for chunk in client.send_message_streaming(message_request):
+                print(chunk)
+
 
         except Exception as e:
             print(f"An error occurred: {e}")

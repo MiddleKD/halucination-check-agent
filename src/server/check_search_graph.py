@@ -17,8 +17,8 @@ from agent.context_consistency_agent import context_consistency_agent
 from agent.get_source_agent import get_source_agent
 from agent.reason_summary_agent import reason_summary_agent
 from dto import (
-    HallucinationGraphOutput as GraphOutput,
-    HallucinationGraphState as GraphState,
+    CheckSearchGraphOutput as GraphOutput,
+    CheckSearchGraphState as GraphState,
     StateDependencies,
 )
 from pydantic_ai import Agent

@@ -17,8 +17,8 @@ from agent.context_consistency_agent import context_consistency_agent
 from agent.reason_summary_agent import reason_summary_agent
 from constant import GRAPH_PERSISTENCE_STATE_PATH_DIR, DUMMY_CONTEXT
 from dto import (
-    NonsenseCheckOutput as GraphOutput,
-    NonsenseCheckState as GraphState,
+    CheckContextGraphOutput as GraphOutput,
+    CheckContextGraphState as GraphState,
     StateDependencies,
 )
 from pydantic_ai import Agent

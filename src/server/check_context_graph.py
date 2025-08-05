@@ -166,7 +166,9 @@ async def run_graph(query: str | list[str], input_context: str, context_id: str)
 
     if snapshot := await persistence.load_next():
         state = snapshot.state
-        start_node = RequestMoreContext(input_context=input_context)
+        start_node = RequestMoreContext(
+            input_context=f"{user_input}\n\n{input_context}"
+        )
     else:
         state = GraphState(
             fall_back_mode=False,

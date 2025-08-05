@@ -28,7 +28,9 @@ class HallucinationCheckExecutor(AgentExecutor):
             else:
                 use_context_graph = True
         
+        input_context_map:dict = {}
         if x := context.metadata.get(A2A_SET_INPUT_CONTEXT_EXTENSION_URI):
+            input_context_map:dict = x
             use_context_graph = True
 
         if use_search_graph and use_context_graph:
@@ -56,7 +58,7 @@ class HallucinationCheckExecutor(AgentExecutor):
                 "task": task,
                 "args": {
                     "query": query,
-                    "input_context": context.metadata.get("input_context", ""),
+                    "input_context": input_context_map.get("input_context", ""),
                     "context_id": task.context_id,
                 }
             }

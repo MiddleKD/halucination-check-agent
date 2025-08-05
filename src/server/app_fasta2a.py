@@ -1,7 +1,7 @@
 # for very simple demo
 
 from fasta2a.schema import AgentProvider, Skill
-from hallucination_check_graph import convert_graph_as_agent
+from check_search_graph import convert_graph_as_agent
 
 agent = convert_graph_as_agent()
 

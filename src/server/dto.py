@@ -13,7 +13,7 @@ class StateDependencies:
 
 
 @dataclass
-class HallucinationGraphState:
+class CheckSearchGraphState:
     stance_type: Literal["pros", "cons", "both"] = "cons"
     fall_back_mode: bool = False
     return_reason: bool = False
@@ -30,14 +30,14 @@ class HallucinationGraphState:
 
 
 @dataclass
-class HallucinationGraphOutput:
+class CheckSearchGraphOutput:
     score: float
     reason: str | None
     ref_url: List[str]
 
 
 @dataclass
-class NonsenseCheckState:
+class CheckContextGraphState:
     return_reason: bool = False
     fall_back_mode: bool = False
     fall_back_limit: int = DEFAULT_FALLBACK_LIMIT
@@ -53,7 +53,7 @@ class NonsenseCheckState:
 
 
 @dataclass
-class NonsenseCheckOutput:
+class CheckContextGraphOutput:
     score: float
     reason: str | None
 

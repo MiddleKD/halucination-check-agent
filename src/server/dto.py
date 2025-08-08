@@ -1,9 +1,21 @@
+"""
+Data Transfer Objects - 할루시네이션 검사 에이전트의 데이터 구조
+
+이 파일은 에이전트 간 데이터 전달을 위한 모든 데이터 클래스와 모델을 정의합니다.
+pydantic과 dataclass를 조합하여 타입 안전성과 직렬화를 보장합니다.
+"""
+
 from dataclasses import dataclass, field
 from typing import List, Literal
 
 from constant import DEFAULT_FALLBACK_LIMIT, SCORE_DIFF_THRESHOLD
 from pydantic import BaseModel, Field
 from pydantic_ai.messages import ModelMessage
+
+
+# ============================================================================
+# 🔧 에이전트 의존성 구성
+# ============================================================================
 
 
 @dataclass
@@ -58,23 +70,36 @@ class CheckContextGraphOutput:
     reason: str | None
 
 
+# ============================================================================
+# 🤖 에이전트 출력 타입 정의
+# ============================================================================
+
 class GetSourceAgentOutputType(BaseModel):
-    summary: str = Field(description="Summary of the reference")
+    """검색 에이전트 출력 형식"""
+    summary: str = Field(
+        description="Summary of the collected reference information"
+    )
     ref_url: List[str] = Field(
-        description="List of reference URL which is helpful to answer",
+        description="List of reference URLs that are helpful for verification",
         examples=["https://example.com", "http://context7/pytorch"],
     )
 
 
 class CtxConsistentAgentOutputType(BaseModel):
+    """일관성 평가 에이전트 출력 형식"""
     hallucination_score: float = Field(
-        description="Score of hallucination (1.0 = contradictory / 0.0 = consistent)",
-        ge=0.0,
-        le=1.0,
-        multiple_of=0.1,
+        description="Hallucination score (0.0 = consistent, 1.0 = contradictory)",
+        ge=0.0,          # 최솟값 0.0
+        le=1.0,          # 최댓값 1.0  
+        multiple_of=0.1, # 0.1 단위로 반올림
     )
-    reason: str = Field(description="Reason of the score")
+    reason: str = Field(
+        description="Detailed explanation for the assigned score"
+    )
 
 
 class ReasonSummaryAgentOutputType(BaseModel):
-    summary: str = Field(description="Summary of the reason")
+    """이유 요약 에이전트 출력 형식"""
+    summary: str = Field(
+        description="Comprehensive summary of evaluation reasons"
+    )

@@ -1,4 +1,4 @@
-# 🤖 Halucination Check Agent
+# 🤖 Hallucination Check Agent
 
 ![Agent Flow Diagram](assets/agent_flow.png)
 

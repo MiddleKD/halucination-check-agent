@@ -1,14 +1,14 @@
 [project]
 name = "halucination-check-agent"
 version = "0.1.0"
-description = "Add your description here"
+description = "NLI-based hallucination detection agent for LLM outputs using A2A protocol"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "langfuse>=3.2.1",
-    "pydantic-ai[logfire]>=0.4.7",
-    "pydantic-ai-slim[a2a,tavily]>=0.4.7",
-    "python-dotenv>=1.1.1",
-    "logfire[httpx]>=4.0.0",
-    "a2a-sdk>=0.3.0",
+    "langfuse==3.2.1",
+    "pydantic-ai[logfire]==0.4.7",
+    "pydantic-ai-slim[a2a,tavily]==0.4.7",
+    "python-dotenv==1.1.1",
+    "logfire[httpx]==4.0.0",
+    "a2a-sdk==0.3.0",
 ]

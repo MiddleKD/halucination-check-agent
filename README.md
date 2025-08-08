@@ -2,10 +2,10 @@
 
 ![Agent Flow Diagram](assets/agent_flow.png)
 
-[![Pydantic AI](https://img.shields.io/badge/agent%20fw-pydantic_ai-pink.svg)](https://www.python.org/downloads/)
-[![Langfuse](https://img.shields.io/badge/observability-langfuse-red.svg)](https://www.python.org/downloads/)
-[![A2A Protocol](https://img.shields.io/badge/protocol-A2A-green.svg)](https://docs.a2a.ai/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![Pydantic AI](https://img.shields.io/badge/agent%20fw-pydantic_ai-pink.svg)
+![Langfuse](https://img.shields.io/badge/observability-langfuse-red.svg)
+![A2A Protocol](https://img.shields.io/badge/protocol-A2A-green.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 **Advanced NLI-based hallucination detection agent for LLM outputs**
 
